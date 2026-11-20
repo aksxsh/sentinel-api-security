@@ -1,0 +1,36 @@
+version: '3.8'
+
+
+x-common-env: &common-env
+  SECURE_MODE: "false"
+  JWT_SECRET: "demo-shared-secret-change-me"
+
+services:
+  users-service:
+    build: ./users-service
+    environment:
+      <<: *common-env
+      PORT: 4001
+    ports:
+      - "4001:4001"
+
+  orders-service:
+    build: ./orders-service
+    environment:
+      <<: *common-env
+      PORT: 4002
+    ports:
+      - "4002:4002"
+
+  api-gateway:
+    build: ./api-gateway
+    environment:
+      <<: *common-env
+      PORT: 3000
+      USERS_SERVICE_URL: "http://users-service:4001"
+      ORDERS_SERVICE_URL: "http://orders-service:4002"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - users-service
+      - orders-service

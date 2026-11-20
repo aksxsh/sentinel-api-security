@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SENTINEL — API Security Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:       #05070c;
+    --panel:      #0c1120;
+    --panel-2:    #10182b;
+    --line:       #1c2740;
+    --line-soft:  #141d33;
+    --violet:     #8b6bff;
+    --cyan:       #2fe0e0;
+    --amber:      #ffb648;
+    --emerald:    #33e2a0;
+    --text:       #dbe2f5;
+    --text-dim:   #6f7d9e;
+    --text-faint: #3d4867;
+    --danger-glow:  0 0 24px rgba(255,182,72,0.35);
+    --secure-glow:  0 0 24px rgba(51,226,160,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(139,107,255,0.14), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 100% 0%, rgba(47,224,224,0.10), transparent 55%),
+      var(--void);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    position: relative;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(139,107,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(139,107,255,0.035) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent 75%);
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .display { font-family: 'Chakra Petch', sans-serif; }
+
+  header {
+    position: relative; z-index: 1;
+    padding: 22px 40px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(12,17,32,0.6), transparent);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--violet), var(--cyan));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Chakra Petch'; font-weight: 700; font-size: 15px; color: #05070c;
+    box-shadow: 0 0 20px rgba(139,107,255,0.5);
+  }
+  .brand h1 { font-family: 'Chakra Petch'; font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.5px; }
+  .brand span.sub { display:block; font-size: 11px; color: var(--text-dim); font-weight: 500; letter-spacing: 1.5px; margin-top: 1px; }
+
+  #modeTag {
+    font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    padding: 8px 16px 8px 34px; border-radius: 20px; position: relative;
+    border: 1px solid var(--line);
+  }
+  #modeTag::before {
+    content: ''; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .mode-on { color: var(--emerald); background: rgba(51,226,160,0.08); border-color: rgba(51,226,160,0.35); }
+  .mode-on::before { background: var(--emerald); box-shadow: 0 0 10px var(--emerald); animation: blink 1.6s infinite; }
+  .mode-off { color: var(--amber); background: rgba(255,182,72,0.08); border-color: rgba(255,182,72,0.35); }
+  .mode-off::before { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: blink 1.6s infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  main { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 32px 40px 80px; }
+
+  /* ---------- TOPOLOGY (signature element) ---------- */
+  .topology-wrap {
+    border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
+    padding: 4px; margin-bottom: 28px; overflow: hidden;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
+  }
+  .topology-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px 4px;
+  }
+  .topology-head h2 { font-family: 'Chakra Petch'; font-size: 13px; letter-spacing: 1.5px; margin: 0; color: var(--text-dim); font-weight: 600; text-transform: uppercase; }
+  .topology-head .live { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--text-faint); }
+  #topologySvg { width: 100%; height: auto; display: block; }
+
+  .node-label { font-family: 'JetBrains Mono'; font-size: 11px; fill: var(--text-dim); }
+  .node-sub { font-family: 'JetBrains Mono'; font-size: 9px; fill: var(--text-faint); }
+  .edge { stroke: var(--line); stroke-width: 1.5; fill: none; }
+  .node-circle { fill: var(--panel-2); stroke: var(--line); stroke-width: 1.5; transition: all 0.4s ease; }
+  .node-circle.gateway { stroke: var(--violet); }
+  .particle-ambient { fill: var(--text-faint); opacity: 0.55; }
+
+  .node-flash-danger .node-circle { stroke: var(--amber); filter: drop-shadow(var(--danger-glow)); }
+  .node-flash-secure .node-circle { stroke: var(--emerald); filter: drop-shadow(var(--secure-glow)); }
+
+  /* ---------- SECTIONS ---------- */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 880px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  section.card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px; margin-bottom: 22px; position: relative;
+  }
+  section.card.accent-violet { border-top: 2px solid var(--violet); }
+  section.card.accent-cyan { border-top: 2px solid var(--cyan); }
+
+  .card-eyebrow { font-family: 'JetBrains Mono'; font-size: 10.5px; letter-spacing: 1.5px; color: var(--text-faint); text-transform: uppercase; margin-bottom: 6px; }
+  h3 { font-family: 'Chakra Petch'; font-size: 16px; margin: 0 0 6px; font-weight: 600; }
+  p.desc { color: var(--text-dim); font-size: 13px; margin: 0 0 16px; line-height: 1.55; }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  select {
+    font-family: 'JetBrains Mono'; font-size: 12.5px; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer;
+  }
+  button {
+    font-family: 'Chakra Petch'; font-size: 12.5px; font-weight: 600; letter-spacing: 0.5px;
+    padding: 10px 18px; border-radius: 8px; border: 1px solid transparent; cursor: pointer;
+    background: linear-gradient(135deg, var(--violet), #6d4cf0); color: white;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px -4px rgba(139,107,255,0.5); }
+  button:active { transform: translateY(0); }
+  button.secondary { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+  button.secondary:hover { box-shadow: 0 6px 20px -4px rgba(0,0,0,0.4); border-color: var(--cyan); }
+
+  pre.out {
+    font-family: 'JetBrains Mono'; font-size: 12px; line-height: 1.6;
+    background: #070a13; border: 1px solid var(--line-soft); border-radius: 8px;
+    padding: 14px 16px; margin-top: 14px; max-height: 220px; overflow: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  pre.out.placeholder::before { content: '// awaiting execution'; color: var(--text-faint); }
+  .jk { color: var(--cyan); } .jsn { color: var(--amber); } .jnum { color: var(--violet); } .jb { color: var(--emerald); }
+
+  .status-line { font-family: 'JetBrains Mono'; font-size: 11.5px; margin-top: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  .status-line.ok { color: var(--emerald); }
+  .status-line.bad { color: var(--amber); }
+
+  .test-index { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--text-faint); }
+
+  footer { text-align: center; padding: 30px; color: var(--text-faint); font-family: 'JetBrains Mono'; font-size: 11px; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">S</div>
+    <div>
+      <h1>SENTINEL</h1>
+      <span class="sub mono">API SECURITY CONSOLE</span>
+    </div>
+  </div>
+  <div id="modeTag" class="mono mode-off">SYNCING…</div>
+</header>
+
+<main>
+
+  <div class="topology-wrap">
+    <div class="topology-head">
+      <h2>Live Traffic Topology</h2>
+      <span class="live mono">gateway ⋅ users-service ⋅ orders-service</span>
+    </div>
+    <svg id="topologySvg" viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg">
+      <!-- edges -->
+      <path id="edge-client-gateway" class="edge" d="M 90 130 L 250 130" />
+      <path id="edge-gateway-users"  class="edge" d="M 300 115 L 470 62" />
+      <path id="edge-gateway-orders" class="edge" d="M 300 145 L 470 198" />
+      <path id="edge-users-db"       class="edge" d="M 560 62 L 700 62" />
+      <path id="edge-orders-db"      class="edge" d="M 560 198 L 700 198" />
+
+      <!-- ambient particles -->
+      <circle r="2.4" class="particle-ambient"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 90 130 L 250 130" /></circle>
+      <circle r="2.4" class="particle-ambient"><animateMotion dur="3.1s" begin="0.6s" repeatCount="indefinite" path="M 300 115 L 470 62" /></circle>
+      <circle r="2.4" class="particle-ambient"><animateMotion dur="3.1s" begin="1.2s" repeatCount="indefinite" path="M 300 145 L 470 198" /></circle>
+      <circle r="2.2" class="particle-ambient"><animateMotion dur="2.6s" begin="0.3s" repeatCount="indefinite" path="M 560 62 L 700 62" /></circle>
+      <circle r="2.2" class="particle-ambient"><animateMotion dur="2.6s" begin="0.9s" repeatCount="indefinite" path="M 560 198 L 700 198" /></circle>
+
+      <!-- nodes -->
+      <g id="node-client">
+        <circle class="node-circle" cx="60" cy="130" r="26" />
+        <text class="node-label" x="60" y="134" text-anchor="middle">CLIENT</text>
+      </g>
+
+      <g id="node-gateway">
+        <circle class="node-circle gateway" cx="275" cy="130" r="30" />
+        <text class="node-label" x="275" y="126" text-anchor="middle">GATEWAY</text>
+        <text class="node-sub" x="275" y="139" text-anchor="middle">:3000</text>
+      </g>
+
+      <g id="node-users">
+        <circle class="node-circle" cx="500" cy="62" r="26" />
+        <text class="node-label" x="500" y="58" text-anchor="middle">USERS</text>
+        <text class="node-sub" x="500" y="70" text-anchor="middle">:4001</text>
+      </g>
+
+      <g id="node-orders">
+        <circle class="node-circle" cx="500" cy="198" r="26" />
+        <text class="node-label" x="500" y="194" text-anchor="middle">ORDERS</text>
+        <text class="node-sub" x="500" y="206" text-anchor="middle">:4002</text>
+      </g>
+
+      <g id="node-usersdb">
+        <circle class="node-circle" cx="730" cy="62" r="22" />
+        <text class="node-label" x="730" y="66" text-anchor="middle" style="font-size:9px">DB</text>
+      </g>
+
+      <g id="node-ordersdb">
+        <circle class="node-circle" cx="730" cy="198" r="22" />
+        <text class="node-label" x="730" y="202" text-anchor="middle" style="font-size:9px">DB</text>
+      </g>
+    </svg>
+  </div>
+
+  <section class="card accent-violet">
+    <div class="card-eyebrow">Access</div>
+    <h3>Authenticate</h3>
+    <p class="desc">Log in as a seeded identity to obtain a bearer token. All seeded accounts share the password <code>password123</code>.</p>
+    <div class="row">
+      <select id="userSelect">
+        <option value="alice@example.com">alice@example.com — user</option>
+        <option value="bob@example.com">bob@example.com — user</option>
+        <option value="carol@example.com">carol@example.com — admin</option>
+      </select>
+      <button onclick="login()">Authenticate</button>
+      <span id="loginStatus" class="status-line mono"></span>
+    </div>
+  </section>
+
+  <div class="grid-2">
+
+    <section class="card accent-cyan">
+      <div class="card-eyebrow test-index">TEST 01 — OWASP API1</div>
+      <h3>Broken Object Level Authorization</h3>
+      <p class="desc">Request order <b>#2</b> (owned by Bob) while authenticated as a different user. A secure API must verify resource ownership before returning it.</p>
+      <div class="row">
+        <button onclick="testBOLA()">Fetch Order #2</button>
+      </div>
+      <pre id="out-bola" class="out placeholder"></pre>
+    </section>
+
+    <section class="card accent-violet">
+      <div class="card-eyebrow test-index">TEST 02 — OWASP API3</div>
+      <h3>Excessive Data Exposure</h3>
+      <p class="desc">Fetch your own profile and inspect whether sensitive fields — like the raw password — leak into the API response.</p>
+      <div class="row">
+        <button onclick="testExposure()">Fetch My Profile</button>
+      </div>
+      <pre id="out-exposure" class="out placeholder"></pre>
+    </section>
+
+    <section class="card accent-cyan">
+      <div class="card-eyebrow test-index">TEST 03 — OWASP API5</div>
+      <h3>Broken Function Level Authorization</h3>
+      <p class="desc">Attempt an admin-only action — deleting user <b>#2</b> — while logged in as a non-admin identity.</p>
+      <div class="row">
+        <button onclick="testAdminDelete()">Delete User #2</button>
+      </div>
+      <pre id="out-admin" class="out placeholder"></pre>
+    </section>
+
+    <section class="card accent-violet">
+      <div class="card-eyebrow test-index">TEST 04 — OWASP API4</div>
+      <h3>Lack of Rate Limiting</h3>
+      <p class="desc">Fires 8 rapid login attempts with an incorrect password. A hardened login endpoint should throttle repeated failures.</p>
+      <div class="row">
+        <button onclick="testRateLimit()">Fire 8 Attempts</button>
+      </div>
+      <pre id="out-rate" class="out placeholder"></pre>
+    </section>
+
+  </div>
+
+  <section class="card accent-cyan">
+    <div class="card-eyebrow test-index">TEST 05 — OWASP API2 / API8</div>
+    <h3>Token Expiry &amp; Error Verbosity</h3>
+    <p class="desc">Inspects your current token's expiry window, then sends a malformed token to check whether internal error details or stack traces leak to the client.</p>
+    <div class="row">
+      <button onclick="testTokenAndErrors()">Run Diagnostic</button>
+    </div>
+    <pre id="out-misc" class="out placeholder"></pre>
+  </section>
+
+</main>
+
+<footer>SENTINEL DEMO CONSOLE — for internal security research &amp; training purposes only</footer>
+
+<script>
+let token = null;
+
+async function loadMode() {
+  try {
+    const res = await fetch('/api/mode');
+    const data = await res.json();
+    const tag = document.getElementById('modeTag');
+    tag.textContent = data.secureMode ? 'SECURE MODE — ACTIVE' : 'VULNERABLE MODE — ACTIVE';
+    tag.className = 'mono ' + (data.secureMode ? 'mode-on' : 'mode-off');
+  } catch (e) {
+    document.getElementById('modeTag').textContent = 'DISCONNECTED';
+  }
+}
+loadMode();
+
+function authHeaders() { return token ? { 'Authorization': 'Bearer ' + token } : {}; }
+
+function flashNode(id, ok) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('node-flash-danger', 'node-flash-secure');
+  void el.offsetWidth; // restart animation
+  el.classList.add(ok ? 'node-flash-secure' : 'node-flash-danger');
+  setTimeout(() => el.classList.remove('node-flash-danger', 'node-flash-secure'), 1400);
+}
+
+function syntaxHighlight(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  return json.replace(/"([^"]+)":/g, '<span class="jk">"$1"</span>:')
+              .replace(/: "([^"]*)"/g, ': <span class="jsn">"$1"</span>')
+              .replace(/: (\-?\d+\.?\d*)/g, ': <span class="jnum">$1</span>')
+              .replace(/: (true|false)/g, ': <span class="jb">$1</span>');
+}
+
+function writeOut(id, status, data) {
+  const el = document.getElementById(id);
+  el.classList.remove('placeholder');
+  el.innerHTML = `<span class="jk">HTTP ${status}</span>\n` + syntaxHighlight(data);
+}
+
+async function login() {
+  const email = document.getElementById('userSelect').value;
+  const res = await fetch('/api/users/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'password123' })
+  });
+  const data = await res.json();
+  const statusEl = document.getElementById('loginStatus');
+  flashNode('node-client', res.ok);
+  if (res.ok) {
+    token = data.token;
+    statusEl.textContent = '● AUTHENTICATED AS ' + email.toUpperCase();
+    statusEl.className = 'status-line mono ok';
+  } else {
+    statusEl.textContent = '● AUTH FAILED';
+    statusEl.className = 'status-line mono bad';
+  }
+}
+
+async function testBOLA() {
+  if (!token) return writeOut('out-bola', '—', { error: 'Authenticate first.' });
+  flashNode('node-gateway', true);
+  const res = await fetch('/api/orders/2', { headers: authHeaders() });
+  const data = await res.json();
+  setTimeout(() => flashNode('node-orders', res.status === 403), 250);
+  writeOut('out-bola', res.status, data);
+}
+
+async function testExposure() {
+  if (!token) return writeOut('out-exposure', '—', { error: 'Authenticate first.' });
+  const payload = JSON.parse(atob(token.split('.')[1]));
+  flashNode('node-gateway', true);
+  const res = await fetch('/api/users/' + payload.id, { headers: authHeaders() });
+  const data = await res.json();
+  const exposed = data.password !== undefined;
+  setTimeout(() => flashNode('node-users', !exposed), 250);
+  writeOut('out-exposure', res.status, { passwordFieldExposed: exposed, response: data });
+}
+
+async function testAdminDelete() {
+  if (!token) return writeOut('out-admin', '—', { error: 'Authenticate first.' });
+  flashNode('node-gateway', true);
+  const res = await fetch('/api/users/2', { method: 'DELETE', headers: authHeaders() });
+  const data = await res.json();
+  setTimeout(() => flashNode('node-users', res.status === 403), 250);
+  writeOut('out-admin', res.status, data);
+}
+
+async function testRateLimit() {
+  const el = document.getElementById('out-rate');
+  el.classList.remove('placeholder');
+  el.textContent = 'firing sequence…';
+  let lines = [];
+  for (let i = 1; i <= 8; i++) {
+    flashNode('node-gateway', true);
+    const res = await fetch('/api/users/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'alice@example.com', password: 'wrongpass' })
+    });
+    lines.push(`attempt ${i}  →  HTTP ${res.status}${res.status === 429 ? '  ⛔ throttled' : ''}`);
+    el.innerHTML = lines.join('\n');
+  }
+}
+
+async function testTokenAndErrors() {
+  let lines = [];
+  if (token) {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    lines.push('token expires: ' + (payload.exp ? new Date(payload.exp * 1000).toISOString() : 'none'));
+  } else {
+    lines.push('no active token — authenticate to inspect expiry');
+  }
+  flashNode('node-gateway', true);
+  const res = await fetch('/api/orders/1', { headers: { 'Authorization': 'Bearer garbage.invalid.token' } });
+  const data = await res.json();
+  const leaked = data.stack !== undefined;
+  setTimeout(() => flashNode('node-orders', !leaked), 250);
+  lines.push('malformed token request → HTTP ' + res.status);
+  lines.push('stack trace leaked to client: ' + leaked);
+  const el = document.getElementById('out-misc');
+  el.classList.remove('placeholder');
+  el.innerHTML = lines.join('\n') + '\n\n' + syntaxHighlight(data);
+}
+</script>
+</body>
+</html>
